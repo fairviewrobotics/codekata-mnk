@@ -38,7 +38,7 @@ window.onload = () => {
     window.onresize = resize;
 
     document.addEventListener('keydown', function(event) {
-        if(event.keyCode == 82) {
+        if(event.keyCode == 73) {
             window.clearInterval(intervalID);
             result = parseInt(prompt("Enter refresh period (ms)"), 10)
             console.log(result)
@@ -56,7 +56,6 @@ function getColorFromPlayerID(index) {
 /* draw a players bar at top */
 function drawPlayers(players, x, y, w, h) {
     /* clear drawing area */
-    render.font = "16px monospace";
     render.fillStyle = "white";
     render.fillRect(x, y, w, h);
     /* divide up for num players */
@@ -64,10 +63,16 @@ function drawPlayers(players, x, y, w, h) {
     let loc = 0;
     for(i in players) {
         const p = players[i];
+        render.font = "15px monospace";
+        render.textAlign = "center";
         render.fillStyle = getColorFromPlayerID(i);
-        render.roundRect(loc + 5, y + 5, areaEach - 10, 25, 5).fill();
+        render.roundRect(loc + 5, y + 5, areaEach - 10, 45, 5).fill();
         render.fillStyle = "white";
-        render.fillText(p.wins + "-" + p.losses + "-" + p.ties + " " + (p.score >= 0 ? "+" : "") + p.score.toFixed(2), loc + areaEach/2 - 50, y + 23);
+        render.fillText(p.name, loc + areaEach/2, y + 22, areaEach - 20);
+        render.font = "16px monospace";
+        render.fillStyle = "white";
+        render.fillText(p.wins + "-" + p.losses + "-" + p.ties + " ("  + p.score.toFixed(2) + ")", loc + areaEach/2, y + 43, areaEach - 20);
+        render.textAlign = "start";
         loc += areaEach;
     }
 }
@@ -85,7 +90,7 @@ function drawMatches(matches, x, y, w, h) {
     render.fillText("Match", x + 10, y + 20);
     render.fillText("Result", x + 130, y + 20);
 
-    let loc = 54;
+    let loc = y + matchHeight;
     for(i in matches) {
         const m = matches[i];
         render.fillStyle = "black";
@@ -97,6 +102,16 @@ function drawMatches(matches, x, y, w, h) {
 
         render.fillStyle = getColorFromPlayerID(m.player2);
         render.roundRect(x + 100, loc + 14, 20, 10, 3).fill();
+
+        if(m.finished && m.winner != null) {
+            if(m.winner == "tie") {
+                render.fillStyle = "black";
+                render.fillText("tie", x + 145, loc + 23);
+            } else {
+                render.fillStyle = getColorFromPlayerID(m.winner)
+                render.roundRect(x + 150, loc + 14, 20, 10, 3).fill();
+            }
+        }
 
         loc += matchHeight;
     }
@@ -121,7 +136,7 @@ function drawBoardCore(board, x, y, w, h) {
             render.fillStyle = getColorFromPlayerID(cell);
 
             render.beginPath();
-            render.arc(x + (w/m) * (xp) + (0.5 * (w/m)), y + (h/n) * yp + (0.5 * (h/n)), (w/m) * 0.4, 0, 2 * Math.PI);
+            render.arc(x + (w/m) * (xp) + (0.5 * (w/m)), y + (h/n) * yp + (0.5 * (h/n)), Math.min((w/m) * 0.4, (h/n) * 0.4), 0, 2 * Math.PI);
 
             render.closePath();
             render.fill();
@@ -158,9 +173,8 @@ function drawBoard(board, matches, loc) {
     const y = loc[1];
     const w = loc[2];
     const h = loc[3];
-    /* clear drawing area */
-    render.fillStyle = "white";
-    render.fillRect(x, y, w, h);
+
+    drawBoardCore(board.board, x + 30, y + 30, w - 60, h - 60);
 
     render.font = "15px monospace";
     render.fillStyle = "black";
@@ -169,6 +183,9 @@ function drawBoard(board, matches, loc) {
         render.fillText("No Active Match", x + w/2 - 65, y + 21);
     } else {
         render.fillText(pad(board.matchID, 3), x + 30, y + 21);
+        render.textAlign = "end";
+        render.fillText("(" + board.m + "," + board.n + "," + board.k + ")", x + w - 30, y + 21);
+        render.textAlign = "start";
         render.fillText("vs", x + w/2 - 10, y + 21);
         const match = matches[board.matchID];
 
@@ -178,15 +195,27 @@ function drawBoard(board, matches, loc) {
         render.roundRect(x + w/2 + 20, y + 8, 40, 14, 3).fill();
 
         const next = nextPlayer(board, matches);
-        if(next != -1) {
+        if(next != -1 && match.finished == false) {
             render.fillStyle = "black";
             render.fillText("Waiting for:", x + w - 200, y + h - 9);
             render.fillStyle = getColorFromPlayerID(next);
             render.roundRect(x + w - 75, y + h - 22, 40, 14, 3).fill();
         }
+        if(match.finished) {
+            render.fillStyle = "black";
+            render.roundRect(x + 30, y + w - 25, w - 60, 20, 5).fill();
+            render.fillStyle = "white";
+            if(match.winner == "tie") {
+                render.textAlign = "center";
+                render.fillText("tie", x + w/2, y + w - 10);
+                render.textAlign = "start";
+            } else {
+                render.fillText("won", x + w/2 + 10, y + w - 10);
+                render.fillStyle = getColorFromPlayerID(match.winner);
+                render.roundRect(x + w/2 - 40, y + w - 22, 40, 14, 3).fill();
+            }
+        }
     }
-
-    drawBoardCore(board.board, x + 30, y + 30, w - 60, h - 60);
 }
 
 /* take a rectangular space and return the square area to draw in */
@@ -215,6 +244,9 @@ function drawBoardsGrid(boards, matches, x, y, w, h, rows, cols) {
 
 /* draw all boards in the appropriate layout (grid) */
 function drawBoards(boards, matches, x, y, w, h) {
+    render.fillStyle = "white";
+    render.fillRect(x, y, w, h);
+
     const numBoards = boards.length;
     if(numBoards == 1) {
         drawBoardsGrid(boards, matches, x, y, w, h, 1, 1);
@@ -244,12 +276,12 @@ function drawBoards(boards, matches, x, y, w, h) {
 /* draws out the dashboard */
 async function main() {
     const players = await JSON.parse(await (await fetch('/api/observe/players')).text());
-    drawPlayers(players, 0, 0, width, 35);
+    drawPlayers(players, 0, 0, width, 55);
     const matches = await JSON.parse(await (await fetch('/api/observe/matches')).text());
-    drawMatches(matches, width - 200, 35, 200, height - 35);
+    drawMatches(matches, width - 200, 55, 200, height - 55);
     const boards = await JSON.parse(await (await fetch('/api/observe/boards')).text());
 
-    drawBoards(boards, matches, 0, 35, width - 200, height - 35);
+    drawBoards(boards, matches, 0, 55, width - 200, height - 55);
 };
 
 intervalID = window.setInterval(main, 1000);
