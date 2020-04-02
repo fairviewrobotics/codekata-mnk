@@ -15,9 +15,12 @@ import kotlin.random.Random
 @RestController
 @RequestMapping(value=["/api"])
 class GameController {
-
-    //val tournament = RRTournament(listOf("secret1", "secret2", "secret3", "secret4", "secret5", "secret6"), 1, { MNKBoard(5, 5, 4) })
-    val tournament = RRTournament(listOf("secret1", "secret2", "secret3", "secret4", "secret5", "secret6"), 6, { MNKBoard(Random.nextInt(3,15), Random.nextInt(3, 15), Random.nextInt(3, 6)) }, 16)
+    val tournament = RRTournament(listOf("secret0", "secret1"), 1, {
+        val m = Random.nextInt(3,15)
+        val n = Random.nextInt(3, 15)
+        val k = minOf(Random.nextInt(3, 5), m, n)
+        MNKBoard(m, n, k)
+    }, 8)
 
     /**
      * Get the current board for a player to solve as a json object:

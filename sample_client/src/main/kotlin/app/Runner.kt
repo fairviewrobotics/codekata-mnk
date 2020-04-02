@@ -107,7 +107,7 @@ class Runner(val ai: AI, val apiUrl: String, val apiKey: String, val refreshInte
 
             for(i in 1 until args.size) {
                 thread {
-                    val run = Runner(AI(), args[0], args[i], 200)
+                    val run = Runner(AI(), args[0], args[i], 1000)
                     println("Starting. API URL: ${args[0]}, API KEY: ${args[1]}")
                     run.setName()
                     run.mainLoop()

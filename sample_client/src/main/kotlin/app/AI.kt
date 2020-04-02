@@ -17,52 +17,19 @@ class AI {
      * which is the x and y position of where to place the piece
      */
     fun solveBoard(board: Board): Pair<Int, Int> {
+        // YOU CAN DELETE OR IMPROVE ALL OF THIS CODE
         // get legal moves we can make on the board
         val moves = board.getLegalMoves(BoardPlayer.US)
 
         // check for moves that let us win
         for(m in moves) {
+            // construct a new board with the move played
             val newBoard = board.withMove(m, BoardPlayer.US)
+            // if the move lets us win, play it
             if(newBoard.hasWon(BoardPlayer.US)) return m
         }
 
-        // check for a move where the opponent would win
-        for(m in moves) {
-            val newBoard = board.withMove(m, BoardPlayer.THEM)
-            if(newBoard.hasWon(BoardPlayer.THEM)) return m
-        }
-
-        // if we can fork, play the fork
-        for(m in moves) {
-            val newBoard = board.withMove(m, BoardPlayer.US)
-            /* check if we have two or more wins */
-            val secMoves = newBoard.getLegalMoves(BoardPlayer.US)
-            val numWins = secMoves.count {s -> newBoard.withMove(s, BoardPlayer.US).hasWon(BoardPlayer.US)}
-            if(numWins >= 2) {
-                println("Forked!")
-                return m
-            }
-        }
-
-        // if we can block a fork, block it
-        for(m in moves) {
-            val newBoard = board.withMove(m, BoardPlayer.THEM)
-            /* check if they have two or more wins */
-            val secMoves = newBoard.getLegalMoves(BoardPlayer.THEM)
-            val numWins = secMoves.count {s -> newBoard.withMove(s, BoardPlayer.THEM).hasWon(BoardPlayer.THEM)}
-            if(numWins >= 2) {
-                println("Blocked Fork!")
-                return m
-            }
-        }
-
-        // pick a random one
+        // otherwise, pick a random one
         return moves.random()
     }
-
-    /*fun solveBoard(board: Board): Pair<Int, Int> {
-        val moves = board.getLegalMoves(BoardPlayer.US)
-
-        return moves.random()
-    }*/
 }
