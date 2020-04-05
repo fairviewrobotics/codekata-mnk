@@ -85,7 +85,8 @@ class RRTournament(val playerKeys: List<String>, val numMatchesAtOnce: Int, val 
             b.isWaitingToClear = true
 
             thread {
-                Thread.sleep(1000)
+                /* display result for 8 seconds */
+                Thread.sleep(8000)
                 b.activeMatch = null
                 b.board = makeBoard()
                 b.isWaitingToClear = false

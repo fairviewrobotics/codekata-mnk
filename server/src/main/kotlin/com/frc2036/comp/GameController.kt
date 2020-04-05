@@ -19,13 +19,13 @@ class GameController {
         val m = Random.nextInt(3, 16)
         val n = Random.nextInt(3, 16)
         /* because higher k's are significantly easier to tie, use a wighted random */
-        /* K - 25%: 3, 30%: 4, 23%: 5, 12%: 6, 3%: 7, 2%: 8, 1%: 9, 1%: 10, 0.5%: 11, 0.5%: 12, 0.5%: 13, 0.25% 14, 0.25% 15 */
+        /* K - 25%: 3, 40%: 4, 18%: 5, 7%: 6, 3%: 7, 2%: 8, 1%: 9, 1%: 10, 0.5%: 11, 0.5%: 12, 0.5%: 13, 0.25% 14, 0.25% 15 */
         val kIndex = Random.nextDouble(0.0, 1.0)
         val k = minOf(when(kIndex) {
             in 0.0..0.25 -> 3
-            in 0.25..0.55 -> 4
-            in 0.55..0.78 -> 5
-            in 0.78..0.90 -> 6
+            in 0.25..0.65 -> 4
+            in 0.65..0.83 -> 5
+            in 0.83..0.90 -> 6
             in 0.90..0.93 -> 7
             in 0.93..0.95 -> 8
             in 0.95..0.96 -> 9
