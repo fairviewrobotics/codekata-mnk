@@ -1,6 +1,7 @@
 let canvas, render, width, height;
 
 let intervalID;
+let matchScreen = 0;
 
 /* add rounded rect method to canvas */
 CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
@@ -44,13 +45,18 @@ window.onload = () => {
             console.log(result)
             intervalID = window.setInterval(main, result)
         }
+        if(event.keyCode == 40) {
+            matchScreen++;
+        } else if(event.keyCode == 38) {
+            if(matchScreen > 0) matchScreen--;
+        }
     }, false);
 };
 
 /* map colors to player index */
 function getColorFromPlayerID(index) {
     /* TODO: pick nice colors */
-    return ["CornflowerBlue", "Crimson", "DarkOrange", "GoldenRod", "Olive", "SaddleBrown"][index];
+    return ["CornflowerBlue", "Crimson", "DarkOrange", "Olive", "DarkSlateBlue", "Grey", "GoldenRod", "SaddleBrown", "MediumAquaMarine", "HotPink"][index];
 }
 
 /* draw a players bar at top */
@@ -91,7 +97,8 @@ function drawMatches(matches, x, y, w, h) {
     render.fillText("Result", x + 130, y + 20);
 
     let loc = y + matchHeight;
-    for(i in matches) {
+    const matchesPerScreen = (h / matchHeight) - 2;
+    for(let i = Math.floor(matchesPerScreen*matchScreen); i < matches.length; i++) {
         const m = matches[i];
         render.fillStyle = "black";
         render.fillText(pad(i.toString(), 3), x + 10, loc + 23);
@@ -118,8 +125,25 @@ function drawMatches(matches, x, y, w, h) {
 
 }
 
-/* draw the body of a single board (no notes around it) */
+/* draw the body of a single board, scaled to keep cell's square */
 function drawBoardCore(board, x, y, w, h) {
+    const m = board.length;
+    const n = board[0].length;
+
+    render.fillStyle = "#D3D3D3";
+    render.fillRect(x-1, y-1, w+2, h+2);
+
+    if(m > n) {
+        const newH = (n/m)*w;
+        drawBoardCoreNoScaling(board, x, y + (h-newH)/2, w, newH);
+    } else {
+        const newW = (m/n)*h;
+        drawBoardCoreNoScaling(board, x + (w-newW)/2, y, newW, h);
+    }
+}
+
+/* draw the body of a single board (no notes around it) */
+function drawBoardCoreNoScaling(board, x, y, w, h) {
     /* clear drawing area */
     render.fillStyle = "white";
     render.fillRect(x, y, w, h);
@@ -273,15 +297,63 @@ function drawBoards(boards, matches, x, y, w, h) {
     }
 }
 
+function drawRankings(rankings, x, y, w, h) {
+    render.fillStyle = "white";
+    render.roundRect(x, y, w, h, 5).fill();
+    render.fillStyle = "black";
+    render.font = "15px monospace";
+
+    render.textAlign = "center";
+    render.fillText("All Matches Are Concluded. Final Rankings: ", x + w/2, y + 25);
+    render.textAlign = "start";
+    rankings = rankings.sort((r1, r2) => r2.score - r1.score);
+    let loc = y + 45;
+    let place = 0;
+    let pScore = -1.0;
+    for(r in rankings) {
+        const rank = rankings[r];
+        if(pScore != rank.score) {
+            place++;
+            render.fillText("" + pad(place, 2) + ". (" + rank.score.toFixed(2) + ") " + rank.name, x + 15, loc);
+        } else {
+            render.fillText("    (" + rank.score.toFixed(2) + ") " + rank.name, x + 15, loc);
+        }
+        loc += 20;
+        pScore = rank.score;
+    }
+
+}
+
 /* draws out the dashboard */
 async function main() {
     const players = await JSON.parse(await (await fetch('/api/observe/players')).text());
-    drawPlayers(players, 0, 0, width, 55);
+    if(players != null) drawPlayers(players, 0, 0, width, 55);
     const matches = await JSON.parse(await (await fetch('/api/observe/matches')).text());
-    drawMatches(matches, width - 200, 55, 200, height - 55);
-    const boards = await JSON.parse(await (await fetch('/api/observe/boards')).text());
+    if(matches != null) drawMatches(matches, width - 200, 55, 200, height - 55);
 
-    drawBoards(boards, matches, 0, 55, width - 200, height - 55);
+
+    let allFinished = true;
+    for(m in matches) {
+        if(!matches[m].finished) allFinished = false;
+    }
+
+    if(allFinished) {
+        const rankings = await JSON.parse(await (await fetch('/api/observe/rankings')).text());
+        if(rankings != null) drawRankings(rankings, 0, 55, width - 200, height - 55);
+    } else {
+        const boards = await JSON.parse(await (await fetch('/api/observe/boards')).text());
+        if(boards != null) drawBoards(boards, matches, 0, 55, width - 200, height - 55);
+    }
+
+    if(players == null) {
+        render.fillStyle = "white";
+        render.fillRect(0, 0, width, height);
+        render.fillStyle = "black";
+        render.textAlign = "center";
+        render.font = "15px monospace";
+        render.fillText("Tournament Has Not Been Initialized. Go to /admin?key=adminkey", width/2, height/2);
+        render.textAlign = "start";
+    }
 };
 
 intervalID = window.setInterval(main, 1000);

@@ -15,12 +15,34 @@ import kotlin.random.Random
 @RestController
 @RequestMapping(value=["/api"])
 class GameController {
-    val tournament = RRTournament(listOf("secret0", "secret1"), 1, {
-        val m = Random.nextInt(3,15)
-        val n = Random.nextInt(3, 15)
-        val k = minOf(Random.nextInt(3, 5), m, n)
+    private final val genNewBoard = {
+        val m = Random.nextInt(3, 16)
+        val n = Random.nextInt(3, 16)
+        /* because higher k's are significantly easier to tie, use a wighted random */
+        /* K - 25%: 3, 30%: 4, 23%: 5, 12%: 6, 3%: 7, 2%: 8, 1%: 9, 1%: 10, 0.5%: 11, 0.5%: 12, 0.5%: 13, 0.25% 14, 0.25% 15 */
+        val kIndex = Random.nextDouble(0.0, 1.0)
+        val k = minOf(when(kIndex) {
+            in 0.0..0.25 -> 3
+            in 0.25..0.55 -> 4
+            in 0.55..0.78 -> 5
+            in 0.80..0.90 -> 6
+            in 0.90..0.93 -> 7
+            in 0.93..0.95 -> 8
+            in 0.95..0.96 -> 9
+            in 0.96..0.97 -> 10
+            in 0.97..0.98 -> 11
+            in 0.98..0.985 -> 12
+            in 0.985..0.99 -> 13
+            in 0.99..0.995 -> 14
+            in 0.995..1.0 -> 15
+            else -> 3
+        }, m, n)
+
         MNKBoard(m, n, k)
-    }, 8)
+    }
+
+    private var tournament: RRTournament? = if(System.getenv("MNK_DISABLE_AUTOSTART") != null) null else
+        RRTournament(listOf("secret0", "secret1"), 1, genNewBoard, 10)
 
     /**
      * Get the current board for a player to solve as a json object:
@@ -31,8 +53,9 @@ class GameController {
     @RequestMapping(value=["/board"], method=[RequestMethod.GET], produces=["application/json"])
     @Synchronized
     fun getBoardToPlay(@RequestParam key: String): String {
-        val player = tournament.players.find { p -> p.key == key} ?: return "null"
-        val board = tournament.getBoardToRun(key) ?: return "null"
+        if(tournament == null) return "null"
+        val player = tournament?.players?.find { p -> p.key == key} ?: return "null"
+        val board = tournament?.getBoardToRun(key) ?: return "null"
         return "{\"m\": ${board.board.m}, \"n\": ${board.board.n}, \"k\": ${board.board.k}," +
             "\"board\": ${board.board.contents.mapIndexed {x, _ -> board.board.contents[x].mapIndexed {y, _ ->
             if(board.board.contents[x][y] == BoardPlayer.NONE) -1 else (
@@ -48,8 +71,9 @@ class GameController {
     @RequestMapping(value=["/move"], method=[RequestMethod.POST], produces=["application/json"])
     @Synchronized
     fun makeMove(@RequestParam key: String, x: Int, y: Int): String {
-        val player = tournament.players.find { p -> p.key == key} ?: return "{ \"error\": \"Invalid Key\" }"
-        val board = tournament.getBoardToRun(key) ?: return "{ \"error\": \"Player doesn't have active board\" }"
+        if(tournament == null) return "{ \"error\": \"Tournament not started\" }"
+        val player = tournament?.players?.find { p -> p.key == key} ?: return "{ \"error\": \"Invalid Key\" }"
+        val board = tournament?.getBoardToRun(key) ?: return "{ \"error\": \"Player doesn't have active board\" }"
         // make sure player is playing on board
         val boardPlayer = (if(board.activeMatch?.player1 == player) BoardPlayer.PLAYER_ONE else
             (if(board.activeMatch?.player2 == player) BoardPlayer.PLAYER_TWO else BoardPlayer.NONE))
@@ -60,7 +84,7 @@ class GameController {
         board.board.doMove(x, y, boardPlayer)
 
         // update for wins, etc
-        tournament.manageBoards()
+        tournament?.manageBoards()
 
         return "{ \"error\": null }"
     }
@@ -71,7 +95,8 @@ class GameController {
     @Synchronized
     @RequestMapping(value=["/set_name"], method=[RequestMethod.POST], produces=["application/json"])
     fun setName(@RequestParam key: String, @RequestParam name: String): String {
-        return if(tournament.setName(key, name)) "{ \"error\": null }" else "{ \"error\": \"Invalid Key\" }"
+        if(tournament == null) return "{ \"error\": \"Tournament not started\" }"
+        return if(tournament?.setName(key, name) == true) "{ \"error\": null }" else "{ \"error\": \"Invalid Key\" }"
     }
 
     /**
@@ -82,11 +107,12 @@ class GameController {
      */
     @RequestMapping(value=["/observe/matches"], method=[RequestMethod.GET], produces=["application/json"])
     fun matches(): String {
-        return "${tournament.schedule.map {m -> "{" +
-            "\"player1\": ${tournament.getPlayerID(m.player1)}, " +
-            "\"player2\": ${tournament.getPlayerID(m.player2)}, " +
+        if(tournament == null) return "null"
+        return "${tournament?.schedule?.map {m -> "{" +
+            "\"player1\": ${tournament?.getPlayerID(m.player1)}, " +
+            "\"player2\": ${tournament?.getPlayerID(m.player2)}, " +
             "\"finished\": ${m.winner != null || m.tie}, " +
-            "\"winner\": ${if(m.tie) "\"tie\"" else (if(m.winner != null) tournament.getPlayerID(m.winner!!).toString() else "null")}" +
+            "\"winner\": ${if(m.tie) "\"tie\"" else (if(m.winner != null) tournament?.getPlayerID(m.winner!!).toString() else "null")}" +
             "}"}}"
     }
 
@@ -96,7 +122,8 @@ class GameController {
      */
     @RequestMapping(value=["/observe/players"], method=[RequestMethod.GET], produces=["application/json"])
     fun players(): String {
-        return "${tournament.players.map {p -> "{" +
+        if(tournament == null) return "null"
+        return "${tournament?.players?.map {p -> "{" +
             "\"name\": \"${p.name}\", " +
             "\"wins\": ${p.wins}, \"losses\": ${p.losses}, \"ties\": ${p.ties}," +
             "\"score\": ${p.score}" +
@@ -111,16 +138,55 @@ class GameController {
      */
     @RequestMapping(value=["/observe/boards"], method=[RequestMethod.GET], produces=["application/json"])
     fun boards(): String {
+        if(tournament == null) return "null"
         fun playerToNum(b: TournamentBoard, player: BoardPlayer): Int {
             if (player == BoardPlayer.NONE || b.activeMatch == null) return -1
-            if (player == BoardPlayer.PLAYER_ONE) return tournament.getPlayerID(b.activeMatch!!.player1)
-            if (player == BoardPlayer.PLAYER_TWO) return tournament.getPlayerID(b.activeMatch!!.player2)
+            if (player == BoardPlayer.PLAYER_ONE) return tournament?.getPlayerID(b.activeMatch!!.player1) ?: -1
+            if (player == BoardPlayer.PLAYER_TWO) return tournament?.getPlayerID(b.activeMatch!!.player2) ?: -1
             return -1
         }
-        return "${tournament.boards.map {b -> "{" +
-            "\"matchID\": ${if(b.activeMatch == null) "null" else tournament.schedule.indexOf(b.activeMatch!!).toString()}, " +
+        return "${tournament?.boards?.map {b -> "{" +
+            "\"matchID\": ${if(b.activeMatch == null) "null" else tournament?.schedule?.indexOf(b.activeMatch!!).toString()}, " +
             "\"m\": ${b.board.m}, \"n\": ${b.board.n}, \"k\": ${b.board.k}, " +
             "\"board\": ${b.board.contents.mapIndexed {x, _ -> b.board.contents[x].mapIndexed {y, _ -> playerToNum(b, b.board.contents[x][y]) }}}" +
             "}"}}"
+    }
+
+    /**
+     * Return overall rankings of players
+     * The same as player's scores expect for teams running multiple players:
+     * [{name: String, score: Float}, ...]
+     */
+    @RequestMapping(value=["/observe/rankings"], method=[RequestMethod.GET], produces=["application/json"])
+    fun rankings(): String {
+        if(tournament == null) return "null"
+        return "${tournament?.players?.map {p -> "{" +
+            "\"name\": \"${p.name}\", " +
+            "\"score\": ${p.score}" +
+            "}"}}"
+    }
+
+    /**
+     * Set the parameters for the tournament and start it
+     */
+    @Synchronized
+    @RequestMapping(value=["/admin/start"], method=[RequestMethod.POST], produces=["application/json"])
+    fun adminStart(@RequestParam key: String, @RequestParam numRematches: Int, @RequestParam numBoards: Int, @RequestParam playerKeys: List<String>): String {
+        val correctKey = System.getenv("MNK_ADMIN_KEY") ?: "adminkey"
+        if(key != correctKey) return "{ \"error\": \"Invalid Admin Key\" }"
+        tournament = RRTournament(playerKeys, numBoards, genNewBoard, numRematches)
+        return "{ \"error\": null }"
+    }
+
+    /**
+     * Stop an active tournament
+     */
+    @Synchronized
+    @RequestMapping(value=["/admin/stop"], method=[RequestMethod.POST], produces=["application/json"])
+    fun adminStop(@RequestParam key: String): String {
+        val correctKey = System.getenv("MNK_ADMIN_KEY") ?: "adminkey"
+        if(key != correctKey) return "{ \"error\": \"Invalid Admin Key\" }"
+        tournament = null
+        return "{ \"error\": null }"
     }
 }

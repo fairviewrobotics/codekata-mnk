@@ -9,4 +9,10 @@ import org.springframework.web.bind.annotation.RequestParam
 class ViewPageController {
     @RequestMapping("/")
     fun main() = "index.html"
+
+    @RequestMapping("/admin")
+    fun admin(@RequestParam key: String): String {
+        val correctKey = System.getenv("MNK_ADMIN_KEY") ?: "adminkey"
+        return if(key != correctKey) "invalidAdminKey.html" else "admin.html"
+    }
 }
